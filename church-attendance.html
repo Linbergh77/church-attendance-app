@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+    <title>Shepherd's Watch | Church Attendance System</title>
+    <!-- Chart.js CDN for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Dexie.js (IndexedDB wrapper) -->
+    <script src="https://unpkg.com/dexie@3.2.5/dist/dexie.js"></script>
+    <!-- Font Awesome 6 (free icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background: #f0f4f8;
+            padding: 20px 16px 40px;
+        }
+
+        /* main container */
+        .app-container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            padding: 20px 18px 28px;
+        }
+
+        h1 {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: #1e3a5f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        h1 i {
+            color: #2c6e9e;
+        }
+
+        .sub {
+            color: #4b6f8c;
+            font-size: 0.85rem;
+            border-left: 3px solid #7cafc2;
+            padding-left: 12px;
+            margin-bottom: 20px;
+        }
+
+        .leader-selector {
+            background: #eef2fa;
+            border-radius: 28px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+        }
+
+        .leader-selector label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: #1e4663;
+        }
+
+        select, button, input {
+            border-radius: 60px;
+            border: 1px solid #cddfe7;
+            padding: 12px 16px;
+            font-size: 1rem;
+            width: 100%;
+            background: white;
+            transition: 0.2s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #2c6e9e;
+            box-shadow: 0 0 0 2px rgba(44,110,158,0.2);
+        }
+
+        button {
+            background: #1e5a7d;
+            color: white;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button.secondary {
+            background: #e2e8f0;
+            color: #1e3a5f;
+            border: 1px solid #cbdde6;
+        }
+
+        button.warning {
+            background: #e07c3c;
+        }
+
+        button.danger {
+            background: #c23b22;
+        }
+
+        .tab-bar {
+            display: flex;
+            gap: 8px;
+            margin: 20px 0 18px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: #eef2fa;
+            color: #2c4c6e;
+            border-radius: 40px;
+            padding: 10px 0;
+            font-size: 0.85rem;
+        }
+
+        .tab-btn.active {
+            background: #1e5a7d;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .panel {
+            display: none;
+            animation: fade 0.2s ease;
+        }
+
+        .panel.active-panel {
+            display: block;
+        }
+
+        @keyframes fade {
+            from { opacity: 0; transform: translateY(6px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+
+        .card {
+            background: #fefefe;
+            border-radius: 24px;
+            padding: 16px;
+            margin: 16px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #e2edf2;
+        }
+
+        .form-row {
+            margin-bottom: 14px;
+        }
+
+        label {
+            font-weight: 500;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+            display: block;
+            color: #2c4f6e;
+        }
+
+        .item-list {
+            margin-top: 20px;
+        }
+
+        .list-item {
+            background: white;
+            border: 1px solid #e2edf2;
+            border-radius: 20px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .item-info {
+            font-weight: 500;
+            flex: 2;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .item-actions button {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            width: auto;
+        }
+
+        .badge {
+            background: #eef2fa;
+            border-radius: 40px;
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #2c6e9e;
+        }
+
+        .stats-grid {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .stat-card {
+            background: #ecf3f9;
+            border-radius: 28px;
+            padding: 12px;
+            flex: 1;
+            text-align: center;
+        }
+        canvas {
+            max-height: 220px;
+            width: 100% !important;
+            margin: 12px 0;
+        }
+        .empty-msg {
+            text-align: center;
+            padding: 28px;
+            color: #7b8c9e;
+        }
+        footer {
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 24px;
+            color: #7f9caf;
+        }
+        i {
+            pointer-events: none;
+        }
+        @media (max-width: 500px) {
+            body { padding: 12px; }
+            .app-container { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container" id="appRoot">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1><i class="fas fa-church"></i> Shepherds Ledger</h1>
+        <button id="logoutBtn" class="secondary" style="width: auto; padding: 8px 16px;"><i class="fas fa-sign-out-alt"></i> Exit</button>
+    </div>
+    <div class="sub">Track CG members · Weekly attendance · Sunday celebration</div>
+
+    <!-- Leader selection zone -->
+    <div class="leader-selector" id="leaderSelectorArea">
+        <label><i class="fas fa-user-astronaut"></i> Select your leader profile</label>
+        <select id="leaderSelect"></select>
+        <button id="confirmLeaderBtn" style="margin-top: 12px;"><i class="fas fa-check-circle"></i> Access Dashboard</button>
+    </div>
+
+    <!-- Main Dashboard (hidden until leader selected) -->
+    <div id="dashboardMain" style="display: none;">
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="membersTab"><i class="fas fa-users"></i> Members</button>
+            <button class="tab-btn" data-tab="cgTab"><i class="fas fa-home"></i> CG Meeting</button>
+            <button class="tab-btn" data-tab="sundayTab"><i class="fas fa-sun"></i> Sunday</button>
+            <button class="tab-btn" data-tab="analyticsTab"><i class="fas fa-chart-line"></i> Analytics</button>
+        </div>
+
+        <!-- Members panel -->
+        <div id="membersTab" class="panel active-panel">
+            <div class="card">
+                <h3><i class="fas fa-user-plus"></i> Register Member</h3>
+                <div class="form-row">
+                    <label>Full Name</label>
+                    <input type="text" id="memberName" placeholder="e.g. Maria Santos">
+                </div>
+                <div class="form-row">
+                    <label>Category</label>
+                    <select id="memberCategory">
+                        <option value="Cat1">Cat1</option><option value="Cat2">Cat2</option><option value="Cat3">Cat3</option>
+                        <option value="Cat4">Cat4</option><option value="UC">UC</option>
+                    </select>
+                </div>
+                <button id="addMemberBtn"><i class="fas fa-save"></i> Add Member</button>
+            </div>
+            <div class="item-list">
+                <h4><i class="fas fa-address-card"></i> My Cell Group Members</h4>
+                <div id="membersListContainer">Loading...</div>
+            </div>
+        </div>
+
+        <!-- CG Attendance panel -->
+        <div id="cgTab" class="panel">
+            <div class="card">
+                <h3><i class="fas fa-calendar-week"></i> Record CG Meeting</h3>
+                <div class="form-row">
+                    <label>Meeting Date</label>
+                    <input type="date" id="cgDate">
+                </div>
+                <div class="form-row">
+                    <label>Number of Attendees</label>
+                    <input type="number" id="cgAttendees" min="0" value="0" step="1">
+                </div>
+                <button id="recordCgBtn"><i class="fas fa-chart-simple"></i> Save Attendance</button>
+            </div>
+            <div class="item-list">
+                <h4><i class="fas fa-history"></i> CG Attendance History</h4>
+                <div id="cgAttendanceList">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Sunday Celebration panel -->
+        <div id="sundayTab" class="panel">
+            <div class="card">
+                <h3><i class="fas fa-sun"></i> Record Sunday Celebration</h3>
+                <div class="form-row">
+                    <label>Sunday Date</label>
+                    <input type="date" id="sundayDate">
+                </div>
+                <div class="form-row">
+                    <label>Number of Attendees (your cell group attendees in Sunday service)</label>
+                    <input type="number" id="sundayAttendees" min="0" value="0">
+                </div>
+                <button id="recordSundayBtn"><i class="fas fa-pray"></i> Save Sunday Record</button>
+            </div>
+            <div class="item-list">
+                <h4><i class="fas fa-calendar-alt"></i> Sunday Attendance Log</h4>
+                <div id="sundayAttendanceList">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Analytics Panel -->
+        <div id="analyticsTab" class="panel">
+            <div class="stats-grid">
+                <div class="stat-card"><i class="fas fa-user-friends"></i> <span id="totalMembersStat">0</span><br>Members</div>
+                <div class="stat-card"><i class="fas fa-church"></i> <span id="avgCgStat">0</span><br>Avg CG Attend.</div>
+                <div class="stat-card"><i class="fas fa-sun"></i> <span id="avgSundayStat">0</span><br>Avg Sunday</div>
+            </div>
+            <div class="card">
+                <h4>👥 Members by Category</h4>
+                <canvas id="categoryPieChart" width="300" height="200" style="max-height: 200px;"></canvas>
+            </div>
+            <div class="card">
+                <h4>📈 Cell Group Attendance Trend</h4>
+                <canvas id="cgTrendChart" width="400" height="200"></canvas>
+            </div>
+            <div class="card">
+                <h4>☀️ Sunday Celebration Trend</h4>
+                <canvas id="sundayTrendChart" width="400" height="200"></canvas>
+            </div>
+            <div class="card">
+                <h4>📊 Summary Insights</h4>
+                <div id="insightsText" style="font-size: 0.85rem;"></div>
+            </div>
+        </div>
+    </div>
+    <footer>⚡ Weekly discipleship tracking | Data stored locally on your device</footer>
+</div>
+
+<script>
+    // ---------- LEADER LIST (exactly as given) ----------
+    const LEADER_NAMES = [
+        "Gel Lardizabal", "Ben Dexter Cagalitan", "Darwin Cuajao", "Jayson Agcoilli", "Jester Francisco",
+        "Paulo Perdio", "Linbergh Valerio", "Rhyan Tadena", "Ronald Relativo", "Rupert Igbaras",
+        "Vincent Tadena", "Arlie Agarma", "Arlie Peralta", "Gloria Jimenez", "JL Marie Barroga",
+        "Rheamay Nicos", "Cecilia Vliches", "Cheryl Joy Lim", "Pamii Tadena", "Stephannie Cujao", "Nancy Lardizabal"
+    ];
+
+    // IndexedDB schema with Dexie
+    let db;
+    let currentLeaderId = null;
+    let currentLeaderName = "";
+    let categoryChart, cgLineChart, sundayLineChart;
+
+    // Initialize Dexie DB
+    async function initDB() {
+        db = new Dexie("ChurchAttendanceDB");
+        db.version(1).stores({
+            leaders: "++id, name",
+            members: "++id, leaderId, name, category",
+            cgAttendance: "++id, leaderId, date, attendees",
+            sundayAttendance: "++id, leaderId, date, attendees"
+        });
+        await db.open();
+        // Seed leaders if table empty
+        const leaderCount = await db.leaders.count();
+        if (leaderCount === 0) {
+            const bulk = LEADER_NAMES.map(name => ({ name }));
+            await db.leaders.bulkAdd(bulk);
+            console.log("Leaders seeded");
+        }
+    }
+
+    // Load leader dropdown
+    async function loadLeaderDropdown() {
+        const leaders = await db.leaders.toArray();
+        const select = document.getElementById("leaderSelect");
+        select.innerHTML = '<option value="">-- Choose Leader --</option>';
+        leaders.forEach(l => {
+            const option = document.createElement("option");
+            option.value = l.id;
+            option.textContent = l.name;
+            select.appendChild(option);
+        });
+    }
+
+    // ------ CRUD for members (leader specific) ------
+    async function renderMembers() {
+        if (!currentLeaderId) return;
+        const members = await db.members.where("leaderId").equals(currentLeaderId).toArray();
+        const container = document.getElementById("membersListContainer");
+        if (members.length === 0) {
+            container.innerHTML = '<div class="empty-msg"><i class="fas fa-users-slash"></i> No members yet. Register your cell group members above.</div>';
+            return;
+        }
+        container.innerHTML = "";
+        members.forEach(m => {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.innerHTML = `
+                <div class="item-info"><strong>${escapeHtml(m.name)}</strong> <span class="badge">${m.category}</span></div>
+                <div class="item-actions">
+                    <button class="secondary edit-member" data-id="${m.id}" style="background:#eef2fa;"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="danger delete-member" data-id="${m.id}"><i class="fas fa-trash-alt"></i> Del</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+        // attach events
+        document.querySelectorAll('.edit-member').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const id = parseInt(btn.dataset.id);
+                const member = await db.members.get(id);
+                if (member) {
+                    const newName = prompt("Edit member name:", member.name);
+                    if (newName && newName.trim()) {
+                        const newCat = prompt(`Category (Cat1,Cat2,Cat3,Cat4,UC):`, member.category);
+                        if (newCat && ["Cat1","Cat2","Cat3","Cat4","UC"].includes(newCat)) {
+                            await db.members.update(id, { name: newName.trim(), category: newCat });
+                            renderMembers();
+                            if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+                        } else alert("Invalid category");
+                    }
+                }
+            });
+        });
+        document.querySelectorAll('.delete-member').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                if(confirm("Remove this member from your cell group?")){
+                    await db.members.delete(parseInt(btn.dataset.id));
+                    renderMembers();
+                    if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+                }
+            });
+        });
+    }
+
+    // CG Attendance render
+    async function renderCgAttendance() {
+        if (!currentLeaderId) return;
+        const records = await db.cgAttendance.where("leaderId").equals(currentLeaderId).sortBy("date");
+        const container = document.getElementById("cgAttendanceList");
+        if (records.length === 0) {
+            container.innerHTML = '<div class="empty-msg"><i class="far fa-calendar-times"></i> No CG meeting records yet.</div>';
+            return;
+        }
+        container.innerHTML = "";
+        for (let rec of records) {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.innerHTML = `
+                <div><strong>📅 ${rec.date}</strong> &nbsp; 👥 ${rec.attendees} attendees</div>
+                <div class="item-actions">
+                    <button class="secondary edit-cg" data-id="${rec.id}" data-date="${rec.date}" data-attendees="${rec.attendees}"><i class="fas fa-pen"></i> Edit</button>
+                    <button class="danger del-cg" data-id="${rec.id}"><i class="fas fa-trash"></i> Del</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+        // edit CG
+        document.querySelectorAll('.edit-cg').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = parseInt(btn.dataset.id);
+                const old = await db.cgAttendance.get(id);
+                if(old){
+                    const newAtt = prompt("Update number of attendees:", old.attendees);
+                    if(newAtt !== null && !isNaN(parseInt(newAtt))){
+                        await db.cgAttendance.update(id, { attendees: parseInt(newAtt) });
+                        renderCgAttendance();
+                        if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+                    }
+                }
+            });
+        });
+        document.querySelectorAll('.del-cg').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if(confirm("Delete this attendance record?")){
+                    await db.cgAttendance.delete(parseInt(btn.dataset.id));
+                    renderCgAttendance();
+                    if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+                }
+            });
+        });
+    }
+
+    async function renderSundayAttendance() {
+        if (!currentLeaderId) return;
+        const records = await db.sundayAttendance.where("leaderId").equals(currentLeaderId).sortBy("date");
+        const container = document.getElementById("sundayAttendanceList");
+        if (records.length === 0) {
+            container.innerHTML = '<div class="empty-msg"><i class="fas fa-sun"></i> No Sunday celebration records yet.</div>';
+            return;
+        }
+        container.innerHTML = "";
+        for (let rec of records) {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.innerHTML = `
+                <div><strong>☀️ ${rec.date}</strong> &nbsp; 🙏 ${rec.attendees} attendees</div>
+                <div class="item-actions">
+                    <button class="secondary edit-sun" data-id="${rec.id}" data-attendees="${rec.attendees}"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="danger del-sun" data-id="${rec.id}"><i class="fas fa-trash"></i> Del</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+        document.querySelectorAll('.edit-sun').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = parseInt(btn.dataset.id);
+                const rec = await db.sundayAttendance.get(id);
+                if(rec){
+                    const val = prompt("Edit Sunday attendees count:", rec.attendees);
+                    if(val !== null && !isNaN(parseInt(val))) await db.sundayAttendance.update(id, { attendees: parseInt(val) });
+                    renderSundayAttendance();
+                    if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+                }
+            });
+        });
+        document.querySelectorAll('.del-sun').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if(confirm("Delete record?")){
+                    await db.sundayAttendance.delete(parseInt(btn.dataset.id));
+                    renderSundayAttendance();
+                    if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+                }
+            });
+        });
+    }
+
+    // Helper to avoid duplicate cg date, handle update logic
+    async function addOrUpdateCG(leaderId, dateStr, attendees) {
+        const existing = await db.cgAttendance.where({ leaderId, date: dateStr }).first();
+        if (existing) {
+            if (confirm(`CG meeting on ${dateStr} already exists with ${existing.attendees} attendees. Update to ${attendees}?`)) {
+                await db.cgAttendance.update(existing.id, { attendees });
+                return true;
+            } else return false;
+        } else {
+            await db.cgAttendance.add({ leaderId, date: dateStr, attendees });
+            return true;
+        }
+    }
+    async function addOrUpdateSunday(leaderId, dateStr, attendees) {
+        const existing = await db.sundayAttendance.where({ leaderId, date: dateStr }).first();
+        if (existing) {
+            if (confirm(`Sunday record for ${dateStr} exists. Update to ${attendees} attendees?`)) {
+                await db.sundayAttendance.update(existing.id, { attendees });
+                return true;
+            } else return false;
+        } else {
+            await db.sundayAttendance.add({ leaderId, date: dateStr, attendees });
+            return true;
+        }
+    }
+
+    // ------- ANALYTICS & CHARTS (per current leader) ---------
+    async function renderAnalytics() {
+        if (!currentLeaderId) return;
+        const members = await db.members.where("leaderId").equals(currentLeaderId).toArray();
+        const cgRecords = await db.cgAttendance.where("leaderId").equals(currentLeaderId).sortBy("date");
+        const sundayRecords = await db.sundayAttendance.where("leaderId").equals(currentLeaderId).sortBy("date");
+        
+        // totals & averages
+        const totalMembers = members.length;
+        const avgCg = cgRecords.length ? (cgRecords.reduce((a,b)=>a+b.attendees,0)/cgRecords.length).toFixed(1) : 0;
+        const avgSun = sundayRecords.length ? (sundayRecords.reduce((a,b)=>a+b.attendees,0)/sundayRecords.length).toFixed(1) : 0;
+        document.getElementById("totalMembersStat").innerText = totalMembers;
+        document.getElementById("avgCgStat").innerText = avgCg;
+        document.getElementById("avgSundayStat").innerText = avgSun;
+
+        // Category distribution
+        const catCount = { Cat1:0, Cat2:0, Cat3:0, Cat4:0, UC:0 };
+        members.forEach(m => { if(catCount[m.category]!==undefined) catCount[m.category]++; });
+        const catLabels = Object.keys(catCount);
+        const catData = catLabels.map(c => catCount[c]);
+        if (categoryChart) categoryChart.destroy();
+        const ctxCat = document.getElementById("categoryPieChart").getContext("2d");
+        categoryChart = new Chart(ctxCat, { type: 'pie', data: { labels: catLabels, datasets: [{ data: catData, backgroundColor: ['#2c6e9e','#4c9fbf','#7fb4c7','#bdd9e6','#e2a36b'] }] }, options: { responsive: true, maintainAspectRatio: true } });
+
+        // CG line chart
+        const cgDates = cgRecords.map(r => r.date);
+        const cgValues = cgRecords.map(r => r.attendees);
+        if (cgLineChart) cgLineChart.destroy();
+        const ctxCg = document.getElementById("cgTrendChart").getContext("2d");
+        cgLineChart = new Chart(ctxCg, { type: 'line', data: { labels: cgDates, datasets: [{ label: 'Cell Group Attendance', data: cgValues, borderColor: '#2c6e9e', tension: 0.2, fill: false }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' } } } });
+
+        // Sunday line chart
+        const sunDates = sundayRecords.map(r => r.date);
+        const sunValues = sundayRecords.map(r => r.attendees);
+        if (sundayLineChart) sundayLineChart.destroy();
+        const ctxSun = document.getElementById("sundayTrendChart").getContext("2d");
+        sundayLineChart = new Chart(ctxSun, { type: 'line', data: { labels: sunDates, datasets: [{ label: 'Sunday Celebration', data: sunValues, borderColor: '#e68a2e', fill: false }] }, options: { responsive: true, maintainAspectRatio: true } });
+
+        const insightHtml = `📌 Total members: ${totalMembers}<br>📌 CG meetings recorded: ${cgRecords.length}<br>📌 Sundays recorded: ${sundayRecords.length}<br>✝️ Keep shepherding!`;
+        document.getElementById("insightsText").innerHTML = insightHtml;
+    }
+
+    // UI update for active leader
+    async function refreshAllData() {
+        if (!currentLeaderId) return;
+        await renderMembers();
+        await renderCgAttendance();
+        await renderSundayAttendance();
+        await renderAnalytics();
+    }
+
+    // Leader login action
+    async function onLeaderConfirm() {
+        const selectEl = document.getElementById("leaderSelect");
+        const leaderId = parseInt(selectEl.value);
+        if (!leaderId) { alert("Please select a leader profile"); return; }
+        const leader = await db.leaders.get(leaderId);
+        if (!leader) return;
+        currentLeaderId = leaderId;
+        currentLeaderName = leader.name;
+        document.getElementById("leaderSelectorArea").style.display = "none";
+        document.getElementById("dashboardMain").style.display = "block";
+        // show active leader badge in logout area
+        document.querySelector(".sub").innerHTML = `<i class="fas fa-user-check"></i> Current Leader: ${leader.name} · Your cell group`;
+        await refreshAllData();
+    }
+
+    function logout() {
+        currentLeaderId = null;
+        document.getElementById("leaderSelectorArea").style.display = "block";
+        document.getElementById("dashboardMain").style.display = "none";
+        document.querySelector(".sub").innerHTML = "Track CG members · Weekly attendance · Sunday celebration";
+        loadLeaderDropdown();
+    }
+
+    // event binding after DOM ready
+    window.addEventListener("DOMContentLoaded", async () => {
+        await initDB();
+        await loadLeaderDropdown();
+        document.getElementById("confirmLeaderBtn").addEventListener("click", onLeaderConfirm);
+        document.getElementById("logoutBtn").addEventListener("click", logout);
+        
+        // Add member
+        document.getElementById("addMemberBtn").addEventListener("click", async () => {
+            if (!currentLeaderId) return alert("Select leader first");
+            const name = document.getElementById("memberName").value.trim();
+            if (!name) return alert("Please enter member name");
+            const category = document.getElementById("memberCategory").value;
+            await db.members.add({ leaderId: currentLeaderId, name, category });
+            document.getElementById("memberName").value = "";
+            await renderMembers();
+            if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+        });
+        
+        // Record CG
+        document.getElementById("recordCgBtn").addEventListener("click", async () => {
+            if (!currentLeaderId) return;
+            let date = document.getElementById("cgDate").value;
+            if (!date) { alert("Select meeting date"); return; }
+            let attendees = parseInt(document.getElementById("cgAttendees").value);
+            if (isNaN(attendees)) attendees = 0;
+            await addOrUpdateCG(currentLeaderId, date, attendees);
+            await renderCgAttendance();
+            if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+            document.getElementById("cgAttendees").value = 0;
+        });
+        // Record Sunday
+        document.getElementById("recordSundayBtn").addEventListener("click", async () => {
+            if (!currentLeaderId) return;
+            let date = document.getElementById("sundayDate").value;
+            if (!date) { alert("Select Sunday date"); return; }
+            let attendees = parseInt(document.getElementById("sundayAttendees").value);
+            if (isNaN(attendees)) attendees = 0;
+            await addOrUpdateSunday(currentLeaderId, date, attendees);
+            await renderSundayAttendance();
+            if(document.getElementById("analyticsTab").classList.contains("active-panel")) renderAnalytics();
+            document.getElementById("sundayAttendees").value = 0;
+        });
+
+        // Tab switching
+        const tabs = document.querySelectorAll(".tab-btn");
+        const panels = document.querySelectorAll(".panel");
+        tabs.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const targetId = btn.dataset.tab;
+                tabs.forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                panels.forEach(panel => panel.classList.remove("active-panel"));
+                document.getElementById(targetId).classList.add("active-panel");
+                if (targetId === "analyticsTab" && currentLeaderId) renderAnalytics();
+                if (targetId === "membersTab" && currentLeaderId) renderMembers();
+                if (targetId === "cgTab" && currentLeaderId) renderCgAttendance();
+                if (targetId === "sundayTab" && currentLeaderId) renderSundayAttendance();
+            });
+        });
+    });
+
+    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+</script>
+</body>
+</html>
